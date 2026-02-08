@@ -1,6 +1,6 @@
 import http
 import requests
-from typing import Mapping
+from typing import Mapping, Dict
 
 # https://github.com/Kludex/starlette/blob/main/starlette/exceptions.py#L7
 class HTTPException(Exception):
@@ -28,12 +28,16 @@ class GithubClient:
         headers = {
             'accept': 'application/vnd.github+json',
             "Authorization": f"Bearer {self.token}",
+            'User-Agent': 'Import-Issues-Gitlab',
             "X-GitHub-Api-Version": "2022-11-28"
         }
         return headers
 
-    def _get_full_url(self, endpoint) -> str:
-        return f"{self.base_url}/{endpoint}"
+    def _get_full_url(self, endpoint: str, params: None | Dict = None) -> str:
+        url = f"{self.base_url}/{endpoint}"
+        if params:
+            url += '?'+'&'.join([i[0]+'='+str(i[1]) for i in params.items()])
+        return url
 
     def _handle_response(self, response):
         if response.status_code == 401:
