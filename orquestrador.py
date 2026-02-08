@@ -2,7 +2,7 @@ import os
 import re
 import json
 import time
-import pandas as pd
+from pandas import DataFrame
 from pydantic import BaseModel
 from typing import List, Dict
 from dotenv import load_dotenv
@@ -40,8 +40,8 @@ class IssueService:
         } for item in issues]
         return issues
 
-    def create_milestones(self, df: pd.DataFrame) -> List[GithubDataModel]:
-        milestones_df = list(df["Milestone"].unique())
+    def create_milestones(self, df: DataFrame) -> List[GithubDataModel]:
+        milestones_df = list(df["Milestone"].dropna().unique())
         new_milestones = list()
         for milestone_title in milestones_df:
             data = {'title': milestone_title}
@@ -49,10 +49,12 @@ class IssueService:
             new_milestones.append({
                 key: value for key,value in milestone.items() if key in ('number', 'state', 'title')
             })
+            time.sleep(1)
         return new_milestones
 
-    def create_issues(self, df: pd.DataFrame, add_assignees=False, add_milestones=False) -> List:
-        issues = self.get_issues('issues', {'sort': 'created', 'direction': 'desc'})
+    def create_issues(self, df: DataFrame, add_assignees=False, add_milestones=False) -> List:
+        df = df.fillna('')
+        issues = self.get_issues({'sort': 'created', 'direction': 'desc'})
         last_issue = issues[0] if issues else 0
         if add_milestones:
             milestones = self.get_milestones()
@@ -63,7 +65,7 @@ class IssueService:
                 'title': row['Title'],
                 'body': self._handle_issue_body(row['Description'], last_issue),
             }
-            labels = self._handle_labels(row['labels'])
+            labels = self._handle_labels(row['Labels'])
             if labels:
                 data['labels'] = labels
 
@@ -85,12 +87,14 @@ class IssueService:
     def _handle_issue_body(text: str, max_issues: int) -> str:
         def replace_issue_number(match):
             old_number = int(match.group(1))
-            return f'#{max_issues + old_number} '
+            return f'#{max_issues + old_number}'
         
-        return re.sub(r'#(\d+)\s+', replace_issue_number, text)
+        return re.sub(r'#(\d+)', replace_issue_number, text)
 
     @staticmethod
     def _handle_labels(labels: str) -> List[str]:
+        if not labels:
+            return
         labels = [lbl.strip() for lbl in labels.split(',')]
         return labels
     
@@ -98,18 +102,20 @@ class IssueService:
     def _map_assignees() -> Dict[str, str] | None:
         if not os.path.exists('assignees_map.json'):
             return
-        with open('assignes_map.json', 'r') as f:
+        with open('assignees_map.json', 'r') as f:
             data = json.load(f)
         return data
 
     @staticmethod
     def _handle_assignees(text: str, assignees_map: Dict[str, str]) -> str | None:
-        if not assignees_map:
+        if not assignees_map or not text:
             return
         return assignees_map.get(text.strip(), None)
     
     @staticmethod
     def _handle_milestone(text: str, milestones: List) -> int | None:
+        if not text:
+            return
         for number, state, title in [m.values() for m in milestones]:
             if text.lower().strip() == title.lower().strip():
                 return number
