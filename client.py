@@ -63,9 +63,9 @@ class GithubClient:
             detail=f"Erro na requisição: {response.status_code}{error_detail}",
         )
 
-    def get(self, endpoint: str):
+    def get(self, endpoint: str, params: None | Dict = None):
         """Faz uma requisição GET."""
-        url = self._get_full_url(endpoint)
+        url = self._get_full_url(endpoint, params)
         response = requests.get(url, headers=self._get_headers())
         return self._handle_response(response)
 
