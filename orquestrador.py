@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import logging
 from pandas import DataFrame
 from pydantic import BaseModel
 from typing import List, Dict
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 from client import GithubClient
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 class GithubDataModel(BaseModel):
     number: int
@@ -49,13 +51,15 @@ class IssueService:
             new_milestones.append({
                 key: value for key,value in milestone.items() if key in ('number', 'state', 'title')
             })
+            if milestone:
+                logger.info(f'Milestone criada: {milestone_title}')
             time.sleep(1)
         return new_milestones
 
     def create_issues(self, df: DataFrame, add_assignees=False, add_milestones=False) -> List:
         df = df.fillna('')
         issues = self.get_issues({'sort': 'created', 'direction': 'desc'})
-        last_issue = issues[0] if issues else 0
+        last_issue = issues[0].get('number', 0) if issues else 0
         if add_milestones:
             milestones = self.get_milestones()
         df = df.sort_values(by='IID')
@@ -81,6 +85,7 @@ class IssueService:
             self.gclient.post(
                 'issues', data=data
             )
+            logger.info(f'Issue Criada: {row["Title"]}')
             time.sleep(1)
 
     @staticmethod
