@@ -2,6 +2,20 @@ import http
 import requests
 from typing import Mapping, Dict
 
+
+RESPONSES: Dict[int, str] = {
+    200: 'OK',
+    201: 'Created',
+    301: 'Moved permanently',
+    304: 'Not modified',
+    400: 'Bad Request',
+    403: 'Forbidden',
+    404: 'Resource not found',
+    410: 'Gone',
+    422: 'Validation failed, or the endpoint has been spammed.',
+    503: 'Service unavailable',
+}
+
 # https://github.com/Kludex/starlette/blob/main/starlette/exceptions.py#L7
 class HTTPException(Exception):
     def __init__(self, status_code: int, detail: str | None = None, headers: Mapping[str, str] | None = None) -> None:
@@ -40,14 +54,10 @@ class GithubClient:
         return url
 
     def _handle_response(self, response):
-        if response.status_code == 401:
+        if response.status_code >= 400:
             raise HTTPException(
-                status_code=401,
-                detail="Falha na autenticação.",
-            )
-        if response.status_code == 404:
-            raise HTTPException(
-                status_code=404, detail="Recurso não encontrado."
+                status_code=response.status_code,
+                detail=RESPONSES.get(response.status_code, 'Erro na requisição'),
             )
         if response.ok:
             try:
@@ -73,7 +83,7 @@ class GithubClient:
         url = f"{self.base_url}/{endpoint}"
         headers = self._get_headers()
         response = requests.post(url, headers=headers, json=data)
-        return response.json()
+        return self._handle_response(response)
 
     def put(self, endpoint, data=None):
         """Faz uma requisição PUT."""
